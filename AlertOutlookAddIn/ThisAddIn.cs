@@ -34,8 +34,10 @@ namespace AlertOutlookAddIn
             {
                 var mailItem = item as Outlook.MailItem;
 
+                Boolean appendfile = Properties.Settings.Default.appendfile;
+
                 if (mailItem.Body.Contains("添付") == true &&
-                  mailItem.Attachments.Count == 0)
+                  mailItem.Attachments.Count == 0 && appendfile == true)
                 {
                     if (MessageBox.Show("添付ファイルがりませんが送信しますか？", "確認", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) == DialogResult.Cancel)
                     {
@@ -45,30 +47,73 @@ namespace AlertOutlookAddIn
                 }
                 
                 string strMsg = "";
-                strMsg = "件名：" + mailItem.Subject + "\n";
-                strMsg = strMsg + "宛先:\n";
+                strMsg = "件名：" + mailItem.Subject + "\n\n";
                 const string PR_SMTP_ADDRESS = "http://schemas.microsoft.com/mapi/proptag/0x39FE001E";
 
+
+
+
+
+
                 Boolean msgboxflg = false;
+                string domains = Properties.Settings.Default.domain;
+                string[] domainList = domains.Split(',');
 
-
-                string mailadress = "";
+                string mailadressTO = "";
+                string mailadressCC = "";
+                string mailadressBCC = "";
+                int cnt = 0;
                 
                 foreach (Outlook.Recipient recip in mailItem.Recipients) 
                 {
                     Outlook.PropertyAccessor pa = recip.PropertyAccessor;
-                            string smtpAddress = pa.GetProperty(PR_SMTP_ADDRESS).ToString();
-                            if(smtpAddress.IndexOf("@lac.co.jp") < 0)
-                            {
-                                msgboxflg = true;
-                            }
+                    
+                    string smtpAddress = pa.GetProperty(PR_SMTP_ADDRESS).ToString();
+                    foreach (string dm in domainList)
+                    {
+                        if (smtpAddress.IndexOf(dm) < 0)
+                        {
+                            msgboxflg = true;
+                            smtpAddress = smtpAddress + " 【注意】 ";
+                            cnt++;
+                                                               }
+                    }
 
-                            mailadress = mailadress + "           " + smtpAddress + "\n";
+
+                    if (recip.Type == 1) { 
+                        mailadressTO = mailadressTO  + smtpAddress + "\n";
+                    }
+                    else if (recip.Type == 2)
+                    {
+                        mailadressCC = mailadressCC  + smtpAddress + "\n";
+
+                    }else{
+                        mailadressBCC = mailadressBCC  + smtpAddress + "\n";
+
+                    }
+
                 }
 
-                strMsg = strMsg + mailadress + "\n";
+                strMsg = strMsg + "[　TO　] --------------------------------------\n\n";
+                strMsg = strMsg +  mailadressTO + "\n";
 
-                 strMsg = strMsg + "上記の宛先に、メールを送信してもよろしいですか?\n";
+                if (mailadressCC.Length > 0) 
+                {
+                    strMsg = strMsg + "[　CC　] --------------------------------------\n\n";
+                    strMsg = strMsg + mailadressCC + "\n";
+                }
+                if (mailadressBCC.Length > 0)
+                {
+                    strMsg = strMsg + "[ BCC　] --------------------------------------\n\n";
+                    strMsg = strMsg + mailadressBCC + "\n";
+                }
+                strMsg = strMsg +     "--------------------------------------------------\n\n";
+
+
+                strMsg = strMsg + "上記の宛先に、メールを送信してもよろしいですか?\n";
+
+                if (msgboxflg == true) strMsg = "【注意】確認が必要なメールアドレスが" + cnt + "つあります。\n\n\n" + strMsg;
+
 
                  if (MessageBox.Show(strMsg, "確認", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) == DialogResult.Cancel)
                 {
